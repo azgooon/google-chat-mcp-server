@@ -5,7 +5,7 @@ from src.providers.google_chat.api.attachments import send_file_message, upload_
 from src.providers.google_chat.api.messages import (
     list_space_messages, create_message, reply_to_thread, get_message, delete_message,
     update_message, add_emoji_reaction, batch_send_messages, list_messages_with_sender_info,
-    get_message_with_sender_info
+    get_message_with_sender_info, quote_reply
 )
 
 from src.providers.google_chat.mcp_instance import mcp, tool
@@ -378,6 +378,110 @@ async def reply_to_message_thread_tool(space_name: str, thread_key: str, text: s
         space_name = f"spaces/{space_name}"
 
     return await reply_to_thread(space_name, thread_key, text, file_path=file_path)
+
+
+@tool()
+async def quote_reply_tool(space_name: str, quoted_message_name: str, text: str) -> dict:
+    """Send a message that quotes another message in a Google Chat space.
+
+    Uses the Google Chat API spaces.messages.create method with quotedMessageMetadata
+    to send a new message that displays as a quote reply. The quoted message appears
+    inline above your reply text, providing context for your response.
+
+    This is different from thread replies:
+    - Thread replies (reply_to_message_thread_tool): Groups messages in a collapsible thread
+    - Quote replies (this tool): Shows the quoted message inline, visible without expanding
+
+    This tool requires OAuth authentication.
+
+    Args:
+        space_name: The resource name of the space to send the message to.
+                   Can be either a full resource name (e.g., 'spaces/AAQAtjsc9v4')
+                   or just the ID portion ('AAQAtjsc9v4'). If only the ID is provided,
+                   it will be automatically prefixed with 'spaces/'.
+
+                   IMPORTANT: You can get space IDs using the get_chat_spaces_tool.
+
+        quoted_message_name: The full resource name of the message to quote.
+                            Must be in the format 'spaces/{space_id}/messages/{message_id}'.
+                            Example: 'spaces/AAQAtjsc9v4/messages/UBHHVc_AAAA.UBHHVc_AAAA'
+
+                            HOW TO GET THIS:
+                            - From search_messages_tool results: use the 'name' field
+                            - From get_space_messages_tool results: use the 'name' field
+                            - From any message object: the 'name' property
+
+        text: Text content of your reply. Can include plain text or limited markdown formatting,
+              including bold, italic, strikethrough, and inline code. Supports up to 4,096 characters.
+
+              FORMATTING TIPS:
+              - Use *asterisks* for bold text
+              - Use _underscores_ for italic text
+              - Use ~tildes~ for strikethrough text
+              - Use `backticks` for inline code
+              - Multiple paragraphs are supported (use blank lines)
+              - URLs will be automatically hyperlinked
+              - Use Unicode emoji symbols directly: "👍 Great work!"
+
+    Returns:
+        The created message object with properties such as:
+        - name: Resource name of the created message (string)
+        - text: The text content of the message (string)
+        - sender: Information about who sent the message (object)
+        - createTime: When the message was created (timestamp)
+        - quotedMessageMetadata: Information about the quoted message (object)
+        - Other properties as applicable
+
+    API Reference:
+        https://developers.google.com/chat/api/reference/rest/v1/spaces.messages/create
+
+    Examples:
+
+    1. Basic quote reply:
+       ```python
+       quote_reply_tool(
+           space_name="spaces/AAQAtjsc9v4",
+           quoted_message_name="spaces/AAQAtjsc9v4/messages/UBHHVc_AAAA.UBHHVc_AAAA",
+           text="I agree with this suggestion!"
+       )
+       ```
+
+    2. Quote reply from search results (workflow):
+       ```python
+       # First, search for the message you want to quote
+       search_results = search_messages_tool(
+           query="project deadline",
+           spaces=["spaces/AAQAtjsc9v4"]
+       )
+
+       # Get the message name from results
+       if search_results["messages"]:
+           message_name = search_results["messages"][0]["name"]
+
+           # Quote reply to it
+           quote_reply_tool(
+               space_name="spaces/AAQAtjsc9v4",
+               quoted_message_name=message_name,
+               text="Thanks for the update on the deadline. I'll have my part ready by then."
+           )
+       ```
+
+    3. Quote reply with formatted response:
+       ```python
+       quote_reply_tool(
+           space_name="spaces/AAQAtjsc9v4",
+           quoted_message_name="spaces/AAQAtjsc9v4/messages/UBHHVc_AAAA.UBHHVc_AAAA",
+           text="*Great point!*\n\nI'll add this to our task list:\n• Review documentation\n• Update the API\n• Test changes"
+       )
+       ```
+    """
+    if not space_name.startswith('spaces/'):
+        space_name = f"spaces/{space_name}"
+
+    if not quoted_message_name.startswith('spaces/'):
+        raise ValueError("quoted_message_name must be a full resource name (spaces/*/messages/*)")
+
+    return await quote_reply(space_name, quoted_message_name, text)
 
 
 @tool()
