@@ -548,6 +548,56 @@ async def get_message_with_sender_info(message_name: str) -> Dict:
     return await get_message(message_name, include_sender_info=True)
 
 
+async def quote_reply(space_name: str, quoted_message_name: str, text: str) -> Dict:
+    """Sends a reply that quotes another message in a Google Chat space.
+
+    Args:
+        space_name: The name/identifier of the space to send the message to
+        quoted_message_name: The full resource name of the message to quote (spaces/*/messages/*)
+        text: Text content of the reply
+
+    Returns:
+        The created message object
+
+    Raises:
+        Exception: If authentication fails or message creation fails
+    """
+    try:
+        creds = get_credentials()
+        if not creds:
+            raise Exception("No valid credentials found. Please authenticate first.")
+
+        service = build('chat', 'v1', credentials=creds)
+
+        # First, get the quoted message to extract lastUpdateTime
+        quoted_message = service.spaces().messages().get(
+            name=quoted_message_name
+        ).execute()
+
+        last_update_time = quoted_message.get('lastUpdateTime') or quoted_message.get('createTime')
+
+        # Build message body with quoted message metadata
+        # Do NOT include thread - quote replies should appear in main conversation
+        message_body = {
+            "text": text,
+            "quotedMessageMetadata": {
+                "name": quoted_message_name,
+                "lastUpdateTime": last_update_time
+            }
+        }
+
+        # Make API request - no messageReplyOption to keep it in main conversation
+        response = service.spaces().messages().create(
+            parent=space_name,
+            body=message_body
+        ).execute()
+
+        return response
+
+    except Exception as e:
+        raise Exception(f"Failed to create quote reply: {str(e)}")
+
+
 async def list_messages_with_sender_info(space_name: str,
                                          limit: int = 10,
                                          page_token: Optional[str] = None,
