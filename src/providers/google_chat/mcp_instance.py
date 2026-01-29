@@ -27,7 +27,7 @@ description = get_provider_config_value(
 
 # Create MCP instance with configuration values
 logger.info(f"Creating FastMCP instance for Google Chat with name: {name}")
-mcp = FastMCP(name, description=description)
+mcp = FastMCP(name, instructions=description)
 
 # Create a tool decorator that registers tools with both the MCP instance and the central registry
 tool = tool_decorator_factory(PROVIDER_NAME, mcp)
